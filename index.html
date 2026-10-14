@@ -1,63 +1,218 @@
-<!DOCTYPE html><html lang="es-MX"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23157a32'/%3E%3C/svg%3E">
 <title>Dashboard de Salud · Héctor</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
-:root{--bg:#0d1117;--card:#161b22;--b:#30363d;--t:#e6edf3;--m:#8b949e;--a:#3fb950;--r:#f85149;--c:#58a6ff}
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--t)}
-header{padding:20px 24px;border-bottom:1px solid var(--b);display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center}
-h1{margin:0;font-size:22px}h2{font-size:16px;margin:0 0 12px}.muted{color:var(--m);font-size:13px}
-main{padding:20px 24px;max-width:1400px;margin:auto}
-.grid{display:grid;gap:14px}.kpis{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}.charts{grid-template-columns:repeat(auto-fit,minmax(380px,1fr));margin-top:18px}.forms{grid-template-columns:repeat(auto-fit,minmax(320px,1fr));margin-top:18px}
-.card{background:var(--card);border:1px solid var(--b);border-radius:12px;padding:16px}
-.kpi .v{font-size:24px;font-weight:700;margin:6px 0}.kpi .d{font-size:12px}.up{color:var(--a)}.down{color:var(--r)}
-.phase{display:flex;gap:16px;align-items:center;flex-wrap:wrap}.bar{flex:1;min-width:200px;height:10px;background:#21262d;border-radius:6px;overflow:hidden}.bar>div{height:100%;background:linear-gradient(90deg,var(--c),var(--a))}
-.badge{background:#1f6feb33;color:var(--c);padding:4px 10px;border-radius:20px;font-size:13px}
-form{display:grid;grid-template-columns:1fr 1fr;gap:8px}form label{font-size:12px;color:var(--m);display:flex;flex-direction:column;gap:3px}
-input,select{width:100%;min-width:0;background:#0d1117;border:1px solid var(--b);color:var(--t);border-radius:6px;padding:7px;font-size:14px}
-button{background:#238636;color:#fff;border:0;border-radius:6px;padding:8px 12px;cursor:pointer;font-size:13px}button.sec{background:#21262d;border:1px solid var(--b)}button.danger{background:#da363433;color:#ff7b72;border:1px solid #da3634}
-form button{grid-column:1/-1}.btns{display:flex;flex-wrap:wrap;gap:6px}
-table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:5px;border-bottom:1px solid var(--b);text-align:left}th{color:var(--m)}.tbl{max-height:220px;overflow:auto;margin-top:10px}
-.x{background:none;color:var(--r);padding:0 4px}canvas{max-height:280px}
-.demo{font-size:11px;padding:5px 9px;background:#9e6a0333;color:#d29922;border:1px dashed #d29922}
-#auth{position:fixed;inset:0;background:#0d1117ee;display:flex;align-items:center;justify-content:center;z-index:10}#auth .card{width:min(92vw,380px);display:flex;flex-direction:column;gap:10px}
-#status{font-size:12px}</style></head><body>
-<div id="auth"><div class="card"><h2>🔐 Iniciar sesión</h2><div class="muted">Recibirás un enlace mágico por correo. Tus datos se sincronizan entre teléfono y computadora.</div><input id="email" type="email" placeholder="tu@correo.com"><button onclick="sendLink()">Enviar enlace mágico</button><div id="authMsg" class="muted"></div></div></div>
-<header><div><h1>🏋️ Dashboard de Salud y Rendimiento</h1><div class="muted">Programa de 12 semanas · Inicio 19 oct 2026 · Grasa corporal · Fuerza · Acondicionamiento</div></div>
-<div class="btns"><button class="sec" onclick="exportJSON()">⬇ Exportar JSON</button><label class="sec" style="background:#21262d;border:1px solid var(--b);padding:8px 12px;border-radius:6px;font-size:13px;cursor:pointer">⬆ Importar JSON<input type="file" accept=".json" hidden onchange="importJSON(this)"></label><button class="sec" onclick="exportCSV()">⬇ Exportar CSV</button>
-<button class="demo" onclick="loadDemo()" title="Solo datos ficticios de ejemplo">🧪 Cargar datos de ejemplo</button><button class="demo" onclick="clearDemo()">Quitar datos de ejemplo</button><button class="sec" id="migBtn" style="display:none" onclick="migrateLocal()">⇪ Migrar datos locales</button><button class="danger" onclick="clearAll()">Borrar todo</button><button class="sec" onclick="sb.auth.signOut()">Salir</button><span id="status" class="muted"></span></div></header>
-<main>
-<div class="card phase"><span class="badge" id="phaseName"></span><span id="weekTxt"></span><div class="bar"><div id="prog"></div></div><span class="muted" id="nextTxt"></span></div>
-<div class="grid kpis" id="kpis" style="margin-top:14px"></div>
-<div class="grid charts">
-<div class="card"><h2>Peso y % de grasa</h2><canvas id="cBody"></canvas></div>
-<div class="card"><h2>1RM estimado (Epley)</h2><canvas id="c1rm"></canvas></div>
-<div class="card"><h2>Volumen semanal (kg)</h2><canvas id="cVol"></canvas></div>
-<div class="card"><h2>FC en reposo</h2><canvas id="cHr"></canvas></div>
-<div class="card"><h2>Adherencia semanal</h2><canvas id="cAdh"></canvas></div>
-<div class="card"><h2>Sueño y energía</h2><canvas id="cSleep"></canvas></div>
+:root{
+  --bg:#0d1117;--card:#161b22;--b:#3d444d;--t:#e6edf3;--m:#c5d0da;
+  --a:#56d364;--r:#ff7b72;--c:#79c0ff;--green:#157a32;--blue:#1158c7;--danger:#b62324;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.45;background:var(--bg);color:var(--t)}
+.topbar{position:sticky;top:0;z-index:40;background:rgba(13,17,23,.96);backdrop-filter:blur(10px);border-bottom:1px solid var(--b);padding-top:env(safe-area-inset-top)}
+header{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;padding:10px 12px 8px}
+.brand{grid-column:1 / -1;min-width:0}
+h1{margin:0;font-size:1.25rem;line-height:1.25;font-weight:700}
+.sub{display:none;margin:4px 0 0}
+h2{font-size:1.125rem;margin:0 0 12px;line-height:1.3}
+.section-title{display:none;margin:28px 0 4px;font-size:1.35rem}
+.muted{color:var(--m)}
+#status{grid-column:1 / -1;font-size:1rem;overflow-wrap:anywhere}
+.tools{grid-column:1;min-width:0}
+#signout{grid-column:2}
+.tools[open],.tools[open] ~ #signout{grid-column:1 / -1}
+.tabs{display:flex;gap:6px;padding:0 12px 10px}
+main{padding:12px 12px calc(28px + env(safe-area-inset-bottom));max-width:1400px;margin:auto}
+.grid{display:grid;gap:12px}
+.kpis{grid-template-columns:1fr;margin-top:12px}
+.charts{grid-template-columns:1fr;margin-top:12px}
+.forms{grid-template-columns:1fr;margin-top:12px}
+.card{background:var(--card);border:1px solid var(--b);border-radius:14px;padding:14px;min-width:0}
+.kpi .v{font-size:2rem;font-weight:800;line-height:1.15;margin:4px 0;letter-spacing:-.02em}
+.kpi .v small{font-size:1rem;font-weight:650;margin-left:2px}
+.kpi .d{font-size:1rem;margin-top:2px}
+.up{color:var(--a)}.down{color:var(--r)}
+.phase{display:flex;flex-direction:column;gap:10px;align-items:stretch}
+.bar{width:100%;height:12px;background:#21262d;border-radius:999px;overflow:hidden}
+.bar>div{height:100%;width:0;background:linear-gradient(90deg,var(--c),var(--a))}
+.badge{display:inline-block;background:#1158c733;color:#79c0ff;padding:6px 12px;border-radius:999px;font-size:1rem;font-weight:700}
+#weekTxt{font-size:1.0625rem;font-weight:700}
+form{display:grid;grid-template-columns:1fr;gap:12px}
+form label{font-size:1rem;color:var(--m);display:flex;flex-direction:column;gap:6px;font-weight:650}
+form span:empty{display:none}
+input,select{width:100%;min-width:0;min-height:48px;background:#0d1117;border:1px solid #6e7681;color:var(--t);border-radius:10px;padding:10px 12px;font-size:16px;line-height:1.3;font-family:inherit}
+button,summary,label.sec{min-height:48px;font-size:16px;font-weight:700;border-radius:10px;padding:12px 14px;cursor:pointer;touch-action:manipulation;font-family:inherit}
+button{background:var(--green);color:#fff;border:0}
+button.sec,summary,label.sec{background:#21262d;color:var(--t);border:1px solid #6e7681;display:inline-flex;align-items:center;justify-content:center;text-align:center;gap:6px}
+button.tab{flex:1;background:#21262d;color:var(--t);border:1px solid var(--b)}
+button.tab.active{background:var(--blue);border-color:var(--blue);color:#fff}
+button.danger{background:var(--danger);color:#fff;border:0}
+button.demo{background:#3d2e0a;color:#e3b341;border:1px dashed #e3b341}
+button.x{background:#3d1518;color:#ffb1ab;border:1px solid #f85149;min-width:48px;min-height:48px;padding:0 12px;font-size:1.25rem;line-height:1}
+summary{list-style:none;width:100%}
+summary::-webkit-details-marker{display:none}
+.desktop-only{display:none}
+.btns{display:none}
+.tools[open] .btns{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.btns button,.btns label.sec{width:100%}
+form button{grid-column:1 / -1}
+.hint{margin:12px 0 0}
+.tbl{margin-top:4px;max-width:100%}
+table{width:100%;border-collapse:collapse;font-size:1rem}
+.chart-box{position:relative;height:260px;width:100%}
+.empty{margin:8px 0 0}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+:focus-visible{outline:3px solid #79c0ff;outline-offset:2px}
+#auth{position:fixed;inset:0;background:#0d1117f2;display:flex;align-items:center;justify-content:center;z-index:80;padding:16px}
+#auth .card{width:min(100%,420px);display:flex;flex-direction:column;gap:12px}
+#auth h2{font-size:1.35rem}
+#authMsg{min-height:1.2em}
+.footnote{margin:16px 0 0}
+@media (max-width:719px){
+  thead{display:none}
+  table,tbody,tr,td{display:block;width:100%}
+  tr{background:#0d1117;border:1px solid var(--b);border-radius:12px;padding:6px 12px 8px;margin:0 0 12px}
+  td{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border:0;padding:5px 0;text-align:right;overflow-wrap:anywhere}
+  td:first-child{font-weight:700}
+  td::before{content:attr(data-label);color:var(--m);font-weight:700;text-align:left;flex:0 0 auto;max-width:46%}
+  td:last-child{justify-content:flex-end;padding-top:8px}
+  td:last-child::before{content:none}
+}
+@media (min-width:420px){
+  .kpis{grid-template-columns:1fr 1fr}
+}
+@media (min-width:720px){
+  form{grid-template-columns:1fr 1fr}
+  .tbl{max-height:420px;overflow:auto}
+  table{min-width:560px}
+  th,td{padding:10px 8px;border-bottom:1px solid var(--b);text-align:left;vertical-align:middle}
+  th{color:var(--m);font-weight:700;position:sticky;top:0;background:var(--card)}
+}
+@media (min-width:900px){
+  header{display:flex;flex-direction:column;align-items:stretch;gap:10px;padding:16px 24px 12px}
+  .sub{display:block}
+  h1{font-size:1.5rem}
+  #signout{display:none}
+  .desktop-only{display:inline-flex}
+  .tools{width:100%}
+  .tools summary{display:none}
+  .tools .btns,.tools[open] .btns{display:flex;flex-direction:row;flex-wrap:wrap;gap:8px;margin:0;width:auto}
+  .btns button,.btns label.sec{width:auto}
+  #status{text-align:left}
+  .tabs{display:none}
+  main [data-panel]{display:block !important}
+  .section-title{display:block}
+  main{padding:20px 24px 48px}
+  .kpis{grid-template-columns:repeat(3,1fr)}
+  .charts{grid-template-columns:1fr 1fr}
+  .chart-box{height:300px}
+  .phase{flex-direction:row;flex-wrap:wrap;align-items:center}
+  .bar{flex:1;min-width:180px}
+  .kpi .v{font-size:2.25rem}
+  .card{padding:16px}
+}
+@media (min-width:1100px){
+  .forms{grid-template-columns:1fr 1fr}
+}
+@media (min-width:1200px){
+  .kpis{grid-template-columns:repeat(4,1fr)}
+}
+</style>
+</head>
+<body>
+<div id="auth"><div class="card"><h2>🔐 Iniciar sesión</h2><div class="muted">Recibirás un enlace mágico por correo. Tus datos se sincronizan entre teléfono y computadora.</div><input id="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="tu@correo.com"><button onclick="sendLink()">Enviar enlace mágico</button><div id="authMsg" class="muted"></div></div></div>
+<div class="topbar">
+<header>
+<div class="brand"><h1>🏋️ Dashboard de Salud y Rendimiento</h1><p class="sub muted">Programa de 12 semanas · Inicio 19 oct 2026 · Grasa corporal · Fuerza · Acondicionamiento</p></div>
+<details class="tools">
+<summary>Herramientas</summary>
+<div class="btns">
+<button type="button" class="sec" onclick="exportJSON()">⬇ Exportar JSON</button>
+<label class="sec">⬆ Importar JSON<input type="file" accept=".json" hidden onchange="importJSON(this)"></label>
+<button type="button" class="sec" onclick="exportCSV()">⬇ Exportar CSV</button>
+<button type="button" class="demo" onclick="loadDemo()" title="Solo datos ficticios de ejemplo">🧪 Cargar datos de ejemplo</button>
+<button type="button" class="demo" onclick="clearDemo()">Quitar datos de ejemplo</button>
+<button type="button" class="sec" id="migBtn" style="display:none" onclick="migrateLocal()">⇪ Migrar datos locales</button>
+<button type="button" class="danger" onclick="clearAll()">Borrar todo</button>
+<button type="button" class="sec desktop-only" onclick="sb.auth.signOut()">Salir</button>
 </div>
+</details>
+<button type="button" class="sec" id="signout" onclick="sb.auth.signOut()">Salir</button>
+<span id="status" class="muted"></span>
+</header>
+<nav class="tabs" role="tablist" aria-label="Secciones">
+<button type="button" class="tab active" role="tab" id="tab-resumen" data-tab="resumen" aria-controls="panel-resumen" aria-selected="true">Resumen</button>
+<button type="button" class="tab" role="tab" id="tab-registrar" data-tab="registrar" aria-controls="panel-registrar" aria-selected="false">Registrar</button>
+<button type="button" class="tab" role="tab" id="tab-historial" data-tab="historial" aria-controls="panel-historial" aria-selected="false">Historial</button>
+</nav>
+</div>
+<main>
+<div id="panel-resumen" data-panel="resumen" role="tabpanel" aria-labelledby="tab-resumen">
+<div class="card phase"><span class="badge" id="phaseName"></span><span id="weekTxt"></span><div class="bar"><div id="prog"></div></div><span class="muted" id="nextTxt"></span></div>
+<div class="grid kpis" id="kpis"></div>
+<div class="grid charts">
+<div class="card"><h2>Peso y % de grasa</h2><div class="chart-box"><canvas id="cBody"></canvas></div></div>
+<div class="card"><h2>1RM estimado (Epley)</h2><div class="chart-box"><canvas id="c1rm"></canvas></div></div>
+<div class="card"><h2>Volumen semanal (kg)</h2><div class="chart-box"><canvas id="cVol"></canvas></div></div>
+<div class="card"><h2>FC en reposo</h2><div class="chart-box"><canvas id="cHr"></canvas></div></div>
+<div class="card"><h2>Adherencia semanal</h2><div class="chart-box"><canvas id="cAdh"></canvas></div></div>
+<div class="card"><h2>Sueño y energía</h2><div class="chart-box"><canvas id="cSleep"></canvas></div></div>
+</div>
+<p class="muted footnote">Masa magra estimada = peso × (1 − %grasa). 1RM Epley = peso × (1 + reps/30). Adherencia = sesiones realizadas (gimnasio L/M/M + equitación fin de semana) / 4. Datos guardados localmente en este navegador.</p>
+</div>
+<div id="panel-registrar" data-panel="registrar" role="tabpanel" aria-labelledby="tab-registrar" hidden>
+<h2 class="section-title">Registrar</h2>
 <div class="grid forms">
 <div class="card"><h2>📏 Métricas corporales</h2><form id="fBody">
-<label>Fecha<input type="date" name="fecha" required></label><label>Peso (kg)<input type="number" step="0.1" name="peso"></label>
-<label>% Grasa<input type="number" step="0.1" name="grasa"></label><label>Cintura (cm)<input type="number" step="0.1" name="cintura"></label>
-<label>Cadera (cm)<input type="number" step="0.1" name="cadera"></label><label>FC reposo (lpm)<input type="number" name="fc"></label>
-<label>Presión sistólica<input type="number" name="sis"></label><label>Presión diastólica<input type="number" name="dia"></label>
-<label>Horas de sueño<input type="number" step="0.1" name="sueno"></label><label>Energía (1-10)<input type="number" min="1" max="10" name="energia"></label>
-<button>Guardar métricas</button></form><div class="tbl" id="tBody"></div></div>
+<label>Fecha<input type="date" name="fecha" required></label>
+<label>Peso (kg)<input type="number" inputmode="decimal" step="0.1" name="peso"></label>
+<label>% Grasa<input type="number" inputmode="decimal" step="0.1" name="grasa"></label>
+<label>Cintura (cm)<input type="number" inputmode="decimal" step="0.1" name="cintura"></label>
+<label>Cadera (cm)<input type="number" inputmode="decimal" step="0.1" name="cadera"></label>
+<label>FC reposo (lpm)<input type="number" inputmode="numeric" name="fc"></label>
+<label>Presión sistólica<input type="number" inputmode="numeric" name="sis"></label>
+<label>Presión diastólica<input type="number" inputmode="numeric" name="dia"></label>
+<label>Horas de sueño<input type="number" inputmode="decimal" step="0.1" name="sueno"></label>
+<label>Energía (1-10)<input type="number" inputmode="numeric" min="1" max="10" name="energia"></label>
+<button>Guardar métricas</button></form>
+<p class="muted hint">Los registros guardados están en Historial.</p></div>
 <div class="card"><h2>🏋️ Registro de entrenamiento</h2><form id="fWork">
-<label>Fecha<input type="date" name="fecha" required></label><label>Sesión<select name="sesion"><option>Lunes · Fuerza inferior</option><option>Martes · Fuerza superior</option><option>Miércoles · Híbrido metabólico</option><option>Extra</option></select></label>
-<label>Ejercicio<input name="ejercicio" list="ejs" required></label><label>Series<input type="number" name="series" required></label>
-<label>Reps<input type="number" name="reps" required></label><label>Peso (kg)<input type="number" step="0.5" name="peso"></label>
-<label>RPE (1-10)<input type="number" step="0.5" min="1" max="10" name="rpe"></label><span></span>
+<label>Fecha<input type="date" name="fecha" required></label>
+<label>Sesión<select name="sesion"><option>Lunes · Fuerza inferior</option><option>Martes · Fuerza superior</option><option>Miércoles · Híbrido metabólico</option><option>Extra</option></select></label>
+<label>Ejercicio<input name="ejercicio" list="ejs" required autocomplete="off"></label>
+<label>Series<input type="number" inputmode="numeric" name="series" required></label>
+<label>Reps<input type="number" inputmode="numeric" name="reps" required></label>
+<label>Peso (kg)<input type="number" inputmode="decimal" step="0.5" name="peso"></label>
+<label>RPE (1-10)<input type="number" inputmode="decimal" step="0.5" min="1" max="10" name="rpe"></label>
 <button>Guardar serie</button></form>
-<datalist id="ejs"><option>Sentadilla trasera</option><option>Press de banca</option><option>Peso muerto</option><option>Press militar</option><option>Peso muerto rumano</option><option>Zancada búlgara</option><option>Remo con barra</option><option>Dominadas</option><option>Swings kettlebell</option></datalist><div class="tbl" id="tWork"></div></div>
+<datalist id="ejs"><option>Sentadilla trasera</option><option>Press de banca</option><option>Peso muerto</option><option>Press militar</option><option>Peso muerto rumano</option><option>Zancada búlgara</option><option>Remo con barra</option><option>Dominadas</option><option>Swings kettlebell</option></datalist>
+<p class="muted hint">Los registros guardados están en Historial.</p></div>
 <div class="card"><h2>🐎 Equitación</h2><form id="fHorse">
-<label>Fecha<input type="date" name="fecha" required></label><label>Duración (h)<input type="number" step="0.25" name="duracion" required></label>
-<label>Intensidad (1-10)<input type="number" min="1" max="10" name="intensidad"></label><label>Tipo<select name="tipo"><option>Práctica</option><option>Concurso de salto</option></select></label>
-<label style="grid-column:1/-1">Notas<input name="notas"></label><button>Guardar sesión</button></form><div class="tbl" id="tHorse"></div></div>
+<label>Fecha<input type="date" name="fecha" required></label>
+<label>Duración (h)<input type="number" inputmode="decimal" step="0.25" name="duracion" required></label>
+<label>Intensidad (1-10)<input type="number" inputmode="numeric" min="1" max="10" name="intensidad"></label>
+<label>Tipo<select name="tipo"><option>Práctica</option><option>Concurso de salto</option></select></label>
+<label style="grid-column:1/-1">Notas<input name="notas" autocomplete="off"></label>
+<button>Guardar sesión</button></form>
+<p class="muted hint">Los registros guardados están en Historial.</p></div>
 </div>
-<p class="muted">Masa magra estimada = peso × (1 − %grasa). 1RM Epley = peso × (1 + reps/30). Adherencia = sesiones realizadas (gimnasio L/M/M + equitación fin de semana) / 4. Datos guardados localmente en este navegador.</p>
+</div>
+<div id="panel-historial" data-panel="historial" role="tabpanel" aria-labelledby="tab-historial" hidden>
+<h2 class="section-title">Historial</h2>
+<div class="grid">
+<div class="card"><h2>📏 Métricas corporales</h2><div class="tbl" id="tBody"></div></div>
+<div class="card"><h2>🏋️ Entrenamientos</h2><div class="tbl" id="tWork"></div></div>
+<div class="card"><h2>🐎 Equitación</h2><div class="tbl" id="tHorse"></div></div>
+</div>
+</div>
 </main>
 <script>
 const KEY='hg_salud_v1',START=new Date('2026-10-19T00:00:00');
@@ -83,7 +238,12 @@ document.querySelectorAll('input[type=date]').forEach(i=>i.value=new Date().toLo
 function bind(fid,arr){document.getElementById(fid).onsubmit=e=>{e.preventDefault();const o={id:id()};new FormData(e.target).forEach((v,k)=>o[k]=isNaN(v)||v===''||k==='fecha'?v:+v);insert(arr,[o]).then(ok=>ok&&load());const f=e.target.fecha.value;e.target.reset();e.target.fecha.value=f}}
 bind('fBody','body');bind('fWork','work');bind('fHorse','horse');
 async function del(a,i){const {error}=await sb.from(T[a]).delete().eq('id',i);if(error)alert(error.message);load()}
-function table(el,arr,cols){document.getElementById(el).innerHTML='<table><tr>'+cols.map(c=>'<th>'+c[1]+'</th>').join('')+'<th></th></tr>'+D[arr].slice().reverse().map(r=>'<tr>'+cols.map(c=>'<td>'+(r[c[0]]??'')+'</td>').join('')+`<td><button class="x" onclick="del('${arr}','${r.id}')">✕</button></td></tr>`).join('')+'</table>'}
+function table(el,arr,cols){
+  const rows=D[arr].slice().reverse();
+  const host=document.getElementById(el);
+  if(!rows.length){host.innerHTML='<p class="empty muted">Sin registros todavía.</p>';return}
+  host.innerHTML='<table><thead><tr>'+cols.map(c=>'<th>'+c[1]+'</th>').join('')+'<th><span class="sr">Acciones</span></th></tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(c=>'<td data-label="'+c[1]+'">'+(r[c[0]]??'')+'</td>').join('')+`<td data-label=""><button type="button" class="x" onclick="del('${arr}','${r.id}')" aria-label="Eliminar">✕</button></td></tr>`).join('')+'</tbody></table>';
+}
 function phase(){const now=new Date(),w=Math.floor((now-START)/6048e5)+1;let n,t;
  if(w<1){n='Pre-programa';t=`Inicia en ${Math.ceil((START-now)/864e5)} días`}else if(w>12){n='Programa completado';t='12/12 semanas'}else{n=w<=4?'Fase 1 · Base':w<=8?'Fase 2 · Desarrollo':w<=11?'Fase 3 · Intensificación':'Semana 12 · Descarga y pruebas';t=`Semana ${w} de 12`}
  phaseName.textContent=n;weekTxt.textContent=t;prog.style.width=Math.max(0,Math.min(100,(w-1)/12*100))+'%';nextTxt.textContent='Gimnasio L/M/M 6:15–7:15 PM · Equitación fin de semana';return w}
@@ -96,24 +256,29 @@ function kpi(name,cur,start,prev,unit,goodDown,dp=1){const d=(a,b,l)=>{if(cur==n
  return `<div class="card kpi"><div class="muted">${name}</div><div class="v">${fmt(cur,dp)} <small class="muted">${unit}</small></div>${d(cur,start,'vs inicio')}${d(cur,prev,'vs sem. ant.')}</div>`}
 function series(arr,f){return arr.filter(r=>f(r)!=null&&!isNaN(f(r)))}
 function metric(f){const s=series(D.body,f);if(!s.length)return[null,null,null];const last=s[s.length-1],ld=new Date(last.fecha);const prev=[...s].reverse().find(r=>(ld-new Date(r.fecha))>=6*864e5);return[f(last),f(s[0]),prev?f(prev):null]}
-const charts={};function chart(id,cfg){charts[id]?.destroy();cfg.options=Object.assign({responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{color:'#c9d1d9'}}},scales:{x:{ticks:{color:'#8b949e'},grid:{color:'#21262d'}},y:{ticks:{color:'#8b949e'},grid:{color:'#21262d'}}}},cfg.options||{});charts[id]=new Chart(document.getElementById(id),cfg)}
+function mergeChartOpts(base,extra){const isObj=v=>v&&typeof v==='object'&&!Array.isArray(v);function merge(a,b){if(!isObj(a)||!isObj(b))return b===undefined?a:b;const out=Object.assign({},a);Object.keys(b).forEach(k=>{out[k]=merge(a[k],b[k])});return out}return merge(base,extra||{})}
+const charts={};
+function chart(id,cfg){charts[id]?.destroy();const narrow=window.matchMedia('(max-width:700px)').matches;const tickFont={size:14};const base={responsive:true,maintainAspectRatio:false,layout:{padding:{top:8,right:10,bottom:4,left:2}},plugins:{legend:{position:narrow?'bottom':'top',labels:{color:'#e6edf3',boxWidth:14,boxHeight:14,padding:narrow?10:14,font:{size:narrow?14:15}}}},elements:{point:{radius:narrow?3:2.5,hitRadius:14}},scales:{x:{ticks:{color:'#c9d1d9',font:tickFont,maxRotation:0,autoSkip:true,maxTicksLimit:narrow?5:8,callback:function(v){let lab=this.getLabelForValue(v);if(narrow&&typeof lab==='string'){if(/^\d{4}-\d{2}-\d{2}/.test(lab))return lab.slice(5);if(/^Sem\s+/.test(lab))return 'S'+lab.replace(/^Sem\s+/,'')}return lab}},grid:{color:'#21262d'}},y:{ticks:{color:'#c9d1d9',font:{size:tickFont.size}},grid:{color:'#21262d'}}}};cfg.options=mergeChartOpts(base,cfg.options||{});charts[id]=new Chart(document.getElementById(id),cfg)}
+function resizeCharts(){requestAnimationFrame(()=>Object.values(charts).forEach(c=>c.resize()))}
 const C=['#58a6ff','#3fb950','#f0883e','#bc8cff','#ff7b72'];
-function render(){const w=phase();Chart.defaults.color='#8b949e';
+function render(){const w=phase();Chart.defaults.color='#c9d1d9';Chart.defaults.font.size=14;Chart.defaults.font.family='system-ui,Segoe UI,Roboto,sans-serif';
  const lean=r=>r.peso&&r.grasa!=null&&r.grasa!==''?r.peso*(1-r.grasa/100):null;
  let h=kpi('Peso',...metric(r=>num(r.peso)),'kg',true)+kpi('% Grasa',...metric(r=>num(r.grasa)),'%',true)+kpi('Masa magra est.',...metric(lean),'kg',false)+kpi('Cintura',...metric(r=>num(r.cintura)),'cm',true)+kpi('FC reposo',...metric(r=>num(r.fc)),'lpm',true,0);
  const R=rms();Object.values(LIFTS).forEach(l=>{const e=Object.entries(R[l]||{}).sort();if(!e.length){h+=kpi('1RM '+l,null,null,null,'kg');return}const cur=e[e.length-1],ld=new Date(cur[0]);const pv=[...e].reverse().find(x=>ld-new Date(x[0])>=6*864e5);h+=kpi('1RM '+l,cur[1],e[0][1],pv?pv[1]:null,'kg',false)});
  const A=adherence(),cw=Math.max(1,Math.min(12,w));h+=kpi(`Adherencia sem. ${cw}`,((A[cw]||0)/4)*100,null,cw>1?((A[cw-1]||0)/4)*100:null,'%',false,0);kpis.innerHTML=h;
- chart('cBody',{type:'line',data:{labels:D.body.map(r=>r.fecha),datasets:[{label:'Peso (kg)',data:D.body.map(r=>num(r.peso)),borderColor:C[0],yAxisID:'y',spanGaps:true,tension:.3},{label:'% Grasa',data:D.body.map(r=>num(r.grasa)),borderColor:C[2],yAxisID:'y1',spanGaps:true,tension:.3}]},options:{scales:{x:{ticks:{color:'#8b949e'}},y:{position:'left',ticks:{color:'#8b949e'},grid:{color:'#21262d'}},y1:{position:'right',ticks:{color:'#8b949e'},grid:{drawOnChartArea:false}}}}});
+ chart('cBody',{type:'line',data:{labels:D.body.map(r=>r.fecha),datasets:[{label:'Peso (kg)',data:D.body.map(r=>num(r.peso)),borderColor:C[0],yAxisID:'y',spanGaps:true,tension:.3},{label:'% Grasa',data:D.body.map(r=>num(r.grasa)),borderColor:C[2],yAxisID:'y1',spanGaps:true,tension:.3}]},options:{scales:{x:{ticks:{color:'#c9d1d9'}},y:{position:'left',ticks:{color:'#c9d1d9'},grid:{color:'#21262d'}},y1:{position:'right',ticks:{color:'#c9d1d9'},grid:{drawOnChartArea:false}}}}});
  const dates=[...new Set(Object.values(R).flatMap(o=>Object.keys(o)))].sort();
  chart('c1rm',{type:'line',data:{labels:dates,datasets:Object.values(LIFTS).map((l,i)=>({label:l,data:dates.map(d=>R[l]?.[d]?+R[l][d].toFixed(1):null),borderColor:C[i],spanGaps:true,tension:.3}))}});
  const vol={};D.work.forEach(r=>{const k=wk(r.fecha);vol[k]=(vol[k]||0)+(r.series||0)*(r.reps||0)*(r.peso||0)});const vw=Object.keys(vol).sort((a,b)=>a-b);
  chart('cVol',{type:'bar',data:{labels:vw.map(x=>'Sem '+x),datasets:[{label:'Volumen (kg)',data:vw.map(x=>Math.round(vol[x])),backgroundColor:C[0]}]}});
  const hr=series(D.body,r=>num(r.fc));chart('cHr',{type:'line',data:{labels:hr.map(r=>r.fecha),datasets:[{label:'FC reposo (lpm)',data:hr.map(r=>r.fc),borderColor:C[4],tension:.3,fill:true,backgroundColor:'#ff7b7222'}]}});
- const aw=Array.from({length:12},(_,i)=>i+1);chart('cAdh',{type:'bar',data:{labels:aw.map(x=>'S'+x),datasets:[{label:'Adherencia %',data:aw.map(x=>A[x]!=null?A[x]/4*100:null),backgroundColor:aw.map(x=>(A[x]||0)>=3?C[1]:C[2])}]},options:{scales:{y:{min:0,max:100,ticks:{color:'#8b949e'},grid:{color:'#21262d'}},x:{ticks:{color:'#8b949e'}}}}});
+ const aw=Array.from({length:12},(_,i)=>i+1);chart('cAdh',{type:'bar',data:{labels:aw.map(x=>'S'+x),datasets:[{label:'Adherencia %',data:aw.map(x=>A[x]!=null?A[x]/4*100:null),backgroundColor:aw.map(x=>(A[x]||0)>=3?C[1]:C[2])}]},options:{scales:{y:{min:0,max:100,ticks:{color:'#c9d1d9'},grid:{color:'#21262d'}},x:{ticks:{color:'#c9d1d9'}}}}});
  chart('cSleep',{type:'line',data:{labels:D.body.map(r=>r.fecha),datasets:[{label:'Sueño (h)',data:D.body.map(r=>num(r.sueno)),borderColor:C[3],spanGaps:true},{label:'Energía (1-10)',data:D.body.map(r=>num(r.energia)),borderColor:C[1],spanGaps:true}]}});
  table('tBody','body',[['fecha','Fecha'],['peso','Peso'],['grasa','%G'],['cintura','Cint.'],['cadera','Cad.'],['fc','FC'],['sis','Sis'],['dia','Dia'],['sueno','Sueño'],['energia','En.']]);
  table('tWork','work',[['fecha','Fecha'],['sesion','Sesión'],['ejercicio','Ejercicio'],['series','S'],['reps','R'],['peso','Kg'],['rpe','RPE']]);
- table('tHorse','horse',[['fecha','Fecha'],['duracion','Horas'],['intensidad','Int.'],['tipo','Tipo'],['notas','Notas']]);}
+ table('tHorse','horse',[['fecha','Fecha'],['duracion','Horas'],['intensidad','Int.'],['tipo','Tipo'],['notas','Notas']]);
+ resizeCharts();
+}
 function dl(name,txt,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type}));a.download=name;a.click()}
 function exportJSON(){dl('salud-hector.json',JSON.stringify(D,null,2),'application/json')}
 function importJSON(inp){const f=inp.files[0];if(!f)return;f.text().then(t=>{const o=JSON.parse(t);if(!o.body||!o.work||!o.horse)return alert('Archivo no válido');(async()=>{for(const k in T)if(o[k].length&&!await insert(k,o[k]))return;load()})()}).catch(()=>alert('Error al leer JSON'));inp.value=''}
@@ -126,4 +291,14 @@ async function loadDemo(){await clearDemo(false);for(const k in D)D[k]=D[k].filt
   if(w!==5)D.horse.push({id:id(),demo:true,fecha:d(w,5),duracion:2+(w%2)*.5,intensidad:6+(w%3),tipo:w%4===2?'Concurso de salto':'Práctica',notas:''})}
  const N={body:[],work:[],horse:[]};for(const k in N){N[k]=D[k].filter(r=>r.demo);if(N[k].length)await insert(k,N[k])}load()}
 render();
-</script></body></html>
+document.querySelectorAll('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{
+  const name=btn.dataset.tab;
+  document.querySelectorAll('[data-panel]').forEach(p=>{p.hidden=p.dataset.panel!==name});
+  document.querySelectorAll('[data-tab]').forEach(b=>{const on=b.dataset.tab===name;b.classList.toggle('active',on);b.setAttribute('aria-selected',on?'true':'false')});
+  if(name==='resumen')resizeCharts();
+  window.scrollTo(0,0);
+}));
+['(max-width:700px)','(max-width:899px)'].forEach(q=>window.matchMedia(q).addEventListener('change',()=>render()));
+</script>
+</body>
+</html>
